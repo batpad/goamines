@@ -9,9 +9,13 @@ how to extend safely**.
 ## Golden rules
 
 1. **Always use `uv`.** Run Python with `uv run python …`; add deps with `uv add …`. Never
-   call bare `python`/`pip` — the venv is local to this repo (`.venv`). (Unused `pandas`
-   was removed; only `openpyxl` + `datasette` + `datasette-cluster-map` are needed. The
-   stdlib `sqlite3` is used for all DB work — no ORM.)
+   call bare `python`/`pip` — the venv is local to this repo (`.venv`). Deps: `openpyxl`
+   (ingest) + `datasette==1.0a33` + `datasette-cluster-map` + `datasette-plot`. The stdlib
+   `sqlite3` is used for all DB work — no ORM. **Datasette is pinned to the 1.0 alpha** (for
+   `datasette-plot`); `datasette==1.0a33` is an explicit pre-release pin so `uv` accepts it.
+   NB: `datasette-dashboards` is **incompatible** with 1.0a (calls the removed
+   `permission_allowed`) — that's why the Overview dashboard is a custom static page, not
+   that plugin.
 2. **Don't name a script after a stdlib module.** An early `inspect.py` shadowed stdlib
    `inspect` and broke numpy import. Avoid `inspect.py`, `types.py`, `csv.py`, etc.
 3. **`ingest.py` is the single source of truth for the DB.** It deletes and rebuilds
@@ -87,14 +91,23 @@ the materialization step re-copies it — just re-run `ingest.py`.**
 
 ## Datasette
 
-- `metadata.yaml` holds table/column docs and canned queries. Canned queries should read
-  from the **materialized tables** (`routes`, `location_flows`, `location_map`,
+- **Config is split (Datasette 1.0):** `metadata.yaml` = descriptive only (title, table/column
+  docs, license, source); `datasette.yaml` (`-c`) = `settings`, `plugins`, and
+  `databases.goamines.queries` (canned queries). Serve with **both** files. Canned queries
+  should read from the **materialized tables** (`routes`, `location_flows`, `location_map`,
   `location_balance`, `monthly`), not the `v_*` views, so they stay under the SQL time limit.
 - The map plugin (`datasette-cluster-map`) auto-renders any table with `latitude`/`longitude`
   columns — that's why `location_map` exposes those exact names.
-- The route-arc map is a **standalone** Leaflet file (`static/routes_map.html`) served via
-  `--static static:static` and linked from the homepage `description_html`. It is **not** a
-  Datasette plugin; regenerate it with `build_route_map.py` (or via `ingest.py`).
+- **`datasette-plot`** adds a "Show Plot" button (Observable Plot) to every table/query page —
+  zero config, the per-query interactivity layer.
+- Two **standalone static pages** in `static/` (served via `--static static:static`, linked
+  from the homepage `description_html`), NOT Datasette plugins:
+  - `routes_map.html` — Leaflet route arcs; **generated** by `build_route_map.py`/`ingest.py` (git-ignored).
+  - `dashboard.html` — the Overview dashboard (Observable Plot via CDN). It is **hand-authored
+    and checked in**, and fetches the canned-query JSON (`/goamines/<query>.json` → `{ok, rows}`)
+    at runtime — so it auto-reflects the DB with no rebuild. Add a chart by adding a canned
+    query in `datasette.yaml` and a `fetch`+`Plot` block in the HTML. (The arbitrary-`?sql=`
+    GET endpoint 302-redirects on 1.0a — drive charts off canned queries, not ad-hoc SQL.)
 
 ## Gotchas
 

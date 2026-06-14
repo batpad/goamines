@@ -10,14 +10,11 @@ description_html: |-
   <p>Locations are messy free text; <code>location_aliases</code> maps every raw string to a
   <code>canonical_name</code> in <code>locations</code>. Coordinates are a partial,
   best-effort geocode (see <code>geocode_source</code>) and some are approximate.</p>
-  <p>🗺️ <a href="/static/routes_map.html"><b>Ore-movement route map</b></a> (curved arcs, width ∝ tonnage)
+  <p>📊 <a href="/static/dashboard.html"><b>Overview dashboard</b></a>
+  &nbsp;·&nbsp; 🗺️ <a href="/static/routes_map.html"><b>Ore-movement route map</b></a>
   &nbsp;·&nbsp; 📍 <a href="/goamines/location_map">Location point map</a></p>
 license: Open data (RTI); attribution to Rahul Basu / datameet
 source: RTI applications — Directorate of Mines & Geology, Goa
-plugins:
-  datasette-cluster-map:
-    latitude_column: latitude
-    longitude_column: longitude
 
 databases:
   goamines:
@@ -85,64 +82,3 @@ databases:
           sources, export gateways = unbounded sinks, royalty has no 2024 baseline.
       v_trip_canon:
         description: Helper — each trip with source/dest mapped to canonical locations.
-
-    queries:
-      top_routes:
-        title: Top routes by tonnage
-        sql: |-
-          SELECT source, destination, ore_stream, trips, tonnage
-          FROM routes ORDER BY tonnage DESC LIMIT 50;
-      monthly_tonnage:
-        title: Monthly tonnage by stream
-        sql: |-
-          SELECT month, ore_stream, trips, tonnage
-          FROM monthly ORDER BY month, ore_stream;
-      busiest_locations:
-        title: Busiest locations (by total tonnage handled)
-        sql: |-
-          SELECT location, ore_stream,
-                 trips_in, tonnage_in, trips_out, tonnage_out, net_tonnage
-          FROM location_flows
-          ORDER BY (COALESCE(tonnage_in,0)+COALESCE(tonnage_out,0)) DESC LIMIT 50;
-      negative_balance_storage:
-        title: "Q1 — does stock go negative at intermediate storage?"
-        description_html: >-
-          From the precomputed <code>location_balance</code>: lowest the running stock ever
-          reaches (opening 31-Mar-2024 + time-ordered trip in/out). Restricted to
-          jetty / plant / stockyard / port (intermediate storage), because mines &amp;
-          out-of-Goa suppliers are unbounded <i>sources</i> (production / imports enter as a
-          permit origin, not a trip) and would go "negative" as a data-boundary artifact.
-          Royalty has no 2024 opening baseline, so its negatives are not conclusive.
-        sql: |-
-          SELECT location, ore_stream, location_type,
-                 min_running_balance, min_balance_dt, has_2024_baseline
-          FROM location_balance
-          WHERE goes_negative = 1
-            AND location_type IN ('jetty','plant','stockyard','port')
-          ORDER BY min_running_balance;
-      stock_reconciliation:
-        title: "Reconstructed vs reported closing stock (31-Mar-2025)"
-        description_html: >-
-          From <code>location_balance</code>: opening (31-Mar-2024) + trip flows up to
-          31-Mar-2025 vs reported 31-Mar-2025 closing stock. Large gaps are expected at
-          export gateways (ship-loading leg is not a trip) and at mines/suppliers (no opening
-          baseline).
-        sql: |-
-          SELECT location, ore_stream, opening_2024,
-                 reconstructed_2025, reported_2025, recon_diff
-          FROM location_balance
-          WHERE reported_2025 IS NOT NULL
-          ORDER BY ABS(recon_diff) DESC LIMIT 60;
-      trip_permits_missing:
-        title: "Completeness — trip permits absent from permit headers"
-        sql: |-
-          SELECT DISTINCT permit_no FROM trips
-          WHERE permit_no NOT IN (SELECT permit_no FROM permits) ORDER BY permit_no;
-      weight_loss_routes:
-        title: Routes with largest source→dest weight change
-        sql: |-
-          SELECT source, destination, ore_stream, trips,
-                 tonnage_src AS src_tons, tonnage AS dst_tons, delta
-          FROM routes
-          WHERE trips > 50
-          ORDER BY ABS(delta) DESC LIMIT 40;

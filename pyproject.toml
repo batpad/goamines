@@ -5,7 +5,8 @@ description = "Goa ore-transport (RTI) data: ingest permits/trips/stock into SQL
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "datasette>=0.65.2",
+    "datasette==1.0a33",
     "datasette-cluster-map>=0.18.2",
+    "datasette-plot>=0.1.0",
     "openpyxl>=3.1.5",
 ]

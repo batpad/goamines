@@ -9,12 +9,11 @@ Group=goamines
 WorkingDirectory=/home/goamines/goamines
 # Serve immutable (-i): the DB is built offline and never written in place, so
 # SQLite needs no WAL/lock files and Datasette can cache aggressively.
+# Datasette 1.0: descriptive metadata in metadata.yaml, config (settings, plugins,
+# canned queries) in datasette.yaml (-c). Settings live in datasette.yaml, not CLI flags.
 ExecStart=/home/goamines/goamines/.venv/bin/datasette serve -i goamines.db \
-  -m metadata.yaml --static static:static \
-  -h 127.0.0.1 -p 8001 \
-  --setting sql_time_limit_ms 8000 \
-  --setting max_returned_rows 5000 \
-  --setting force_https_urls 1
+  -m metadata.yaml -c datasette.yaml --static static:static \
+  -h 127.0.0.1 -p 8001
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true

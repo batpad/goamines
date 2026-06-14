@@ -13,9 +13,12 @@ Files referenced below live in this `deploy/` folder:
 - `nginx-goamines.conf` — nginx server block (HTTP-first; certbot adds 443)
 - `update.sh` — pull + sync + rebuild/refresh helper
 
-Datasette serves three things from the working dir: `goamines.db`, `metadata.yaml`, and
-`static/routes_map.html`. The raw data (`data1/`, `data2/`) and `goamines.db` are
-git-ignored, so the DB is provisioned out-of-band (step 5).
+Datasette (1.0a) serves from the working dir using `metadata.yaml` (descriptive metadata) +
+`datasette.yaml` (settings, plugins, canned queries), with `goamines.db` and the
+`static/` pages (`dashboard.html`, `routes_map.html`). The config files and
+`static/dashboard.html` arrive via `git`; the raw data (`data1/`, `data2/`),
+`goamines.db`, and the generated `static/routes_map.html` are git-ignored, so the DB +
+route map are provisioned out-of-band (step 5).
 
 ---
 

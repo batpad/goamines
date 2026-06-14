@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Goa Ore Movement — Overview</title>
+<style>
+  :root { --imported:#1f77b4; --royalty:#2ca02c; --eauction:#ff7f0e; --ink:#1b1b1b; --muted:#666; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+         color:var(--ink); background:#f5f6f8; }
+  header { background:#fff; border-bottom:1px solid #e3e6ea; padding:18px 24px; }
+  header h1 { margin:0 0 4px; font-size:20px; }
+  header p { margin:0; color:var(--muted); font-size:13px; }
+  header a { color:#1f6feb; text-decoration:none; }
+  header a:hover { text-decoration:underline; }
+  main { max-width:1180px; margin:0 auto; padding:20px 24px 48px; }
+  .metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin-bottom:20px; }
+  .metric { background:#fff; border:1px solid #e3e6ea; border-radius:10px; padding:16px 18px; }
+  .metric .v { font-size:26px; font-weight:650; letter-spacing:-.5px; }
+  .metric .l { color:var(--muted); font-size:13px; margin-top:2px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:16px; }
+  .card { background:#fff; border:1px solid #e3e6ea; border-radius:10px; padding:14px 16px; min-width:0; }
+  .card h2 { margin:0 0 2px; font-size:15px; }
+  .card .sub { color:var(--muted); font-size:12px; margin:0 0 10px; }
+  .card.wide { grid-column:1 / -1; }
+  .err { color:#b00; font-size:13px; }
+  figure { margin:0; }
+  footer { max-width:1180px; margin:0 auto; padding:0 24px 40px; color:var(--muted); font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Goa Ore Movement — Overview</h1>
+  <p>Truck &amp; barge ore movement, 25-Mar-2024 onward (weighbridge tonnage at destination).
+     &nbsp;·&nbsp; <a href="/">Data &amp; tables</a>
+     &nbsp;·&nbsp; <a href="/static/routes_map.html">Route map</a>
+     &nbsp;·&nbsp; <a href="/goamines/location_map">Point map</a></p>
+</header>
+<main>
+  <div class="metrics" id="metrics"></div>
+  <div class="grid">
+    <div class="card wide"><h2>Monthly tonnage by stream</h2><p class="sub">Stacked, MT/month</p><figure id="c-monthly"></figure></div>
+    <div class="card"><h2>Tonnage by ore stream</h2><p class="sub">Total MT moved</p><figure id="c-stream"></figure></div>
+    <div class="card"><h2>Top routes by tonnage</h2><p class="sub">Top 15, excluding intra-location shuffles</p><figure id="c-routes"></figure></div>
+    <div class="card"><h2>Busiest locations</h2><p class="sub">Top 15 by tonnage handled (in + out)</p><figure id="c-busiest"></figure></div>
+    <div class="card"><h2>Where running stock goes negative</h2><p class="sub">Intermediate storage only · min reconstructed balance (MT)</p><figure id="c-neg"></figure></div>
+  </div>
+</main>
+<footer>
+  Built from the goamines Datasette (canned queries). Balance figures carry data-boundary
+  caveats — see the project FINDINGS. Charts: Observable Plot.
+</footer>
+
+<script type="module">
+import * as Plot from "https://cdn.jsdelivr.net/npm/@observablehq/plot@0.6/+esm";
+
+const COLOR = { domain:["imported","royalty","eauction"], range:["#1f77b4","#2ca02c","#ff7f0e"], legend:true };
+const fmt = n => Math.round(n).toLocaleString();
+const trunc = (s,n=34) => s.length>n ? s.slice(0,n-1)+"…" : s;
+
+async function q(name){
+  const r = await fetch(`/goamines/${name}.json`);
+  const j = await r.json();
+  if(!j.ok) throw new Error(j.error||name);
+  return j.rows;
+}
+function fail(id,e){ document.getElementById(id).innerHTML = `<span class="err">couldn't load: ${e.message}</span>`; }
+function W(id){ return document.getElementById(id).clientWidth || 520; }
+
+// ---- metric cards ----
+q("dash_totals").then(rows=>{
+  const t = rows[0];
+  document.getElementById("metrics").innerHTML = [
+    [fmt(t.tonnage)+" MT","ore moved (by trip, @dest)"],
+    [fmt(t.trips),"truck / barge trips"],
+    [fmt(t.permits),"transport permits"],
+    [fmt(t.mapped_locations),"mapped locations"],
+  ].map(([v,l])=>`<div class="metric"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+}).catch(e=>document.getElementById("metrics").innerHTML=`<span class="err">totals failed: ${e.message}</span>`);
+
+// ---- monthly stacked area ----
+q("monthly_tonnage").then(rows=>{
+  const data = rows.map(d=>({...d, date:new Date(d.month+"-01")}));
+  document.getElementById("c-monthly").append(Plot.plot({
+    width:W("c-monthly"), height:300, marginLeft:60, x:{label:null}, y:{label:"MT", grid:true},
+    color:COLOR,
+    marks:[ Plot.areaY(data,{x:"date",y:"tonnage",fill:"ore_stream",tip:true}), Plot.ruleY([0]) ]
+  }));
+}).catch(e=>fail("c-monthly",e));
+
+// ---- tonnage by stream ----
+q("dash_stream_split").then(rows=>{
+  document.getElementById("c-stream").append(Plot.plot({
+    width:W("c-stream"), height:300, marginLeft:64, x:{label:null}, y:{label:"MT", grid:true},
+    color:COLOR,
+    marks:[ Plot.barY(rows,{x:"ore_stream",y:"tonnage",fill:"ore_stream",tip:true}), Plot.ruleY([0]) ]
+  }));
+}).catch(e=>fail("c-stream",e));
+
+// ---- top routes (exclude self-loops) ----
+q("top_routes").then(rows=>{
+  const data = rows.filter(d=>d.source!==d.destination)
+                   .slice(0,15)
+                   .map(d=>({route:trunc(d.source+" → "+d.destination), tonnage:d.tonnage, ore_stream:d.ore_stream}));
+  document.getElementById("c-routes").append(Plot.plot({
+    width:W("c-routes"), height:380, marginLeft:230, x:{label:"MT", grid:true}, y:{label:null},
+    color:COLOR,
+    marks:[ Plot.barX(data,{x:"tonnage",y:"route",fill:"ore_stream",sort:{y:"x",reverse:true},tip:true}) ]
+  }));
+}).catch(e=>fail("c-routes",e));
+
+// ---- busiest locations ----
+q("busiest_locations").then(rows=>{
+  const data = rows.map(d=>({location:trunc(d.location,28),
+                             tonnage:(d.tonnage_in||0)+(d.tonnage_out||0), ore_stream:d.ore_stream}))
+                   .sort((a,b)=>b.tonnage-a.tonnage).slice(0,15);
+  document.getElementById("c-busiest").append(Plot.plot({
+    width:W("c-busiest"), height:380, marginLeft:170, x:{label:"MT", grid:true}, y:{label:null},
+    color:COLOR,
+    marks:[ Plot.barX(data,{x:"tonnage",y:"location",fill:"ore_stream",sort:{y:"x",reverse:true},tip:true}) ]
+  }));
+}).catch(e=>fail("c-busiest",e));
+
+// ---- negative balance ----
+q("negative_balance_storage").then(rows=>{
+  const data = rows.map(d=>({location:trunc(d.location,26), min:d.min_running_balance, ore_stream:d.ore_stream}))
+                   .sort((a,b)=>a.min-b.min);
+  document.getElementById("c-neg").append(Plot.plot({
+    width:W("c-neg"), height:300, marginLeft:160, x:{label:"min running balance (MT)", grid:true}, y:{label:null},
+    color:COLOR,
+    marks:[ Plot.barX(data,{x:"min",y:"location",fill:"ore_stream",sort:{y:"x"},tip:true}), Plot.ruleX([0]) ]
+  }));
+}).catch(e=>fail("c-neg",e));
+</script>
+</body>
+</html>

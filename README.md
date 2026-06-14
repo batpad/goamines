@@ -52,17 +52,19 @@ uv sync
 # 2. build the database from data1/ + data2/  (~15s; one command does everything)
 uv run python ingest.py
 
-# 3. serve it
-uv run datasette goamines.db -m metadata.yaml --static static:static \
-  --setting sql_time_limit_ms 8000 --setting max_returned_rows 5000
+# 3. serve it  (settings live in datasette.yaml)
+uv run datasette serve -i goamines.db -m metadata.yaml -c datasette.yaml --static static:static
 ```
 
-Then open <http://127.0.0.1:8765/>:
+Then open <http://127.0.0.1:8001/> (or whatever port Datasette prints):
+- **📊 Overview dashboard** — `/static/dashboard.html` — metric cards + charts (Observable Plot).
 - **🗺️ Route map** — `/static/routes_map.html` — curved arcs per route, width ∝ tonnage,
   colour by ore stream.
 - **📍 Location point map** — `/goamines/location_map` — geocoded locations (cluster map).
+- **Interactive charts** — every table & SQL/canned-query page has a **"Show Plot"** button
+  (datasette-plot) to chart the result.
 - **Canned queries** — top routes, monthly tonnage, busiest locations, the negative-balance
-  check, stock reconciliation, completeness flags (see the homepage / `metadata.yaml`).
+  check, stock reconciliation, completeness flags (defined in `datasette.yaml`).
 
 > All Python is run through **`uv`** so the venv stays local to this repo. Use
 > `uv run python …` and `uv add <pkg>` — not bare `python`/`pip`.
@@ -143,7 +145,9 @@ build_route_map.py   # generate static/routes_map.html (Leaflet route arcs)
 geocode.py           # Nominatim geocode by facility name        -> locations_geocode.csv
 geocode_villages.py  # Nominatim geocode by village anchor (ANCHORS dict) -> locations_geocode.csv
 qa.py                # validation + analysis report (run after ingest)
-metadata.yaml        # Datasette config: table/column docs, canned queries, map plugin
+metadata.yaml        # Datasette 1.0 descriptive metadata: table/column docs
+datasette.yaml       # Datasette 1.0 config: settings, plugins, canned queries
+static/dashboard.html# custom Observable Plot dashboard (reads canned-query JSON)
 locations_geocode.csv# persistent, hand-editable coordinates (checked in)
 FINDINGS.md          # the analytical write-up — start here
 AGENTS.md            # orientation for AI agents / contributors extending the pipeline
