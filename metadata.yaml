@@ -1,0 +1,148 @@
+title: Goa Ore Transport
+description_html: |-
+  <p>Goa government mineral-ore transport data — permits, truck/barge trips, and closing
+  stock — reconstructed from RTI applications (data collected by Rahul Basu, shared via
+  the datameet list). Covers 1-Apr-2020 → 2025 (permits) and 25-Mar-2024 onward (trips).</p>
+  <p><b>Ore streams:</b> <i>imported</i> (a.k.a. Captive — ore brought from overseas / other
+  states for consumption or re-export), <i>royalty</i> (Goa-mined, royalty paid), and
+  <i>eauction</i> (Goa ore sold via government e-auction). Three software eras feed the
+  permits: Megasoft (pre-GEL), and Old / New Bhumija (GEL).</p>
+  <p>Locations are messy free text; <code>location_aliases</code> maps every raw string to a
+  <code>canonical_name</code> in <code>locations</code>. Coordinates are a partial,
+  best-effort geocode (see <code>geocode_source</code>) and some are approximate.</p>
+  <p>🗺️ <a href="/static/routes_map.html"><b>Ore-movement route map</b></a> (curved arcs, width ∝ tonnage)
+  &nbsp;·&nbsp; 📍 <a href="/goamines/location_map">Location point map</a></p>
+license: Open data (RTI); attribution to Rahul Basu / datameet
+source: RTI applications — Directorate of Mines & Geology, Goa
+plugins:
+  datasette-cluster-map:
+    latitude_column: latitude
+    longitude_column: longitude
+
+databases:
+  goamines:
+    tables:
+      permits:
+        description: >-
+          One row per transport permit (header level), unified across all 3 software eras
+          and 3 ore streams. used_qty / balance_qty exist only for Megasoft. Old↔New Bhumija
+          overlap is kept; set is_superseded=0 to get the de-duplicated snapshot.
+        columns:
+          permit_no: Permit identifier (Megasoft 'ITP DMG-…/2020-21'; Bhumija 'ILT072400024')
+          software_era: megasoft / old_bhumija / new_bhumija
+          ore_stream: imported (=Captive) / royalty / eauction
+          category: transit / export / sale / import
+          is_superseded: 1 = an Old-Bhumija row also present (preferred) in New Bhumija
+          permit_qty: Permit / proposed quantity (MT)
+          used_qty: Quantity used against the permit (Megasoft only)
+          balance_qty: Permit balance (Megasoft only)
+        units:
+          permit_qty: t
+          used_qty: t
+          balance_qty: t
+      trips:
+        description: >-
+          One row per truck or barge trip (Annexure II), 25-Mar-2024 onward. Weighbridge
+          weight is recorded at both source and destination; qty_delta = dest − source.
+        columns:
+          permit_no: Permit this trip was booked against (joins to permits.permit_no)
+          vehicle_or_barge: Truck registration (e.g. GA04T0169) or barge/vessel name (M V …)
+          qty_source: Loaded quantity at the source weighbridge (MT)
+          qty_dest: Loaded quantity at the destination weighbridge (MT)
+          qty_delta: dest − source (MT)
+        units:
+          qty_source: t
+          qty_dest: t
+          qty_delta: t
+      closing_stock:
+        description: >-
+          Reported closing stock by location & stream at 31-Mar-2024 and 31-Mar-2025
+          (Annexure III). NOTE: royalty stock for 31-Mar-2024 is missing from the source.
+      locations:
+        description: >-
+          Canonical location gazetteer. lat/lon is a partial best-effort geocode
+          (geocode_source = manual / nominatim / NULL); treat as approximate.
+      location_aliases:
+        description: Maps every raw location string to a canonical_name in locations.
+      routes:
+        description: Source → destination route totals (canonical locations), by stream.
+      location_flows:
+        description: Per-location inflow / outflow / net tonnage (canonical), by stream.
+      location_map:
+        description: Geocoded locations with in/out tonnage — rendered on a map.
+      monthly:
+        description: Monthly trip count & tonnage by stream.
+      v_permit_trips:
+        description: Permits joined to their realised trip totals (excludes superseded rows).
+      v_closing_stock:
+        description: Closing stock rolled up to canonical locations.
+      location_balance:
+        description: >-
+          Precomputed per-(stream, location) balance reconstruction over the trip window.
+          min_running_balance is the lowest the stock ever reaches (the negative-balance
+          test); reconstructed_2025 vs reported_2025 reconciles trip flows against reported
+          closing stock. Read with the data-boundary caveats: mines/external = unbounded
+          sources, export gateways = unbounded sinks, royalty has no 2024 baseline.
+      v_trip_canon:
+        description: Helper — each trip with source/dest mapped to canonical locations.
+
+    queries:
+      top_routes:
+        title: Top routes by tonnage
+        sql: |-
+          SELECT source, destination, ore_stream, trips, tonnage
+          FROM routes ORDER BY tonnage DESC LIMIT 50;
+      monthly_tonnage:
+        title: Monthly tonnage by stream
+        sql: |-
+          SELECT month, ore_stream, trips, tonnage
+          FROM monthly ORDER BY month, ore_stream;
+      busiest_locations:
+        title: Busiest locations (by total tonnage handled)
+        sql: |-
+          SELECT location, ore_stream,
+                 trips_in, tonnage_in, trips_out, tonnage_out, net_tonnage
+          FROM location_flows
+          ORDER BY (COALESCE(tonnage_in,0)+COALESCE(tonnage_out,0)) DESC LIMIT 50;
+      negative_balance_storage:
+        title: "Q1 — does stock go negative at intermediate storage?"
+        description_html: >-
+          From the precomputed <code>location_balance</code>: lowest the running stock ever
+          reaches (opening 31-Mar-2024 + time-ordered trip in/out). Restricted to
+          jetty / plant / stockyard / port (intermediate storage), because mines &amp;
+          out-of-Goa suppliers are unbounded <i>sources</i> (production / imports enter as a
+          permit origin, not a trip) and would go "negative" as a data-boundary artifact.
+          Royalty has no 2024 opening baseline, so its negatives are not conclusive.
+        sql: |-
+          SELECT location, ore_stream, location_type,
+                 min_running_balance, min_balance_dt, has_2024_baseline
+          FROM location_balance
+          WHERE goes_negative = 1
+            AND location_type IN ('jetty','plant','stockyard','port')
+          ORDER BY min_running_balance;
+      stock_reconciliation:
+        title: "Reconstructed vs reported closing stock (31-Mar-2025)"
+        description_html: >-
+          From <code>location_balance</code>: opening (31-Mar-2024) + trip flows up to
+          31-Mar-2025 vs reported 31-Mar-2025 closing stock. Large gaps are expected at
+          export gateways (ship-loading leg is not a trip) and at mines/suppliers (no opening
+          baseline).
+        sql: |-
+          SELECT location, ore_stream, opening_2024,
+                 reconstructed_2025, reported_2025, recon_diff
+          FROM location_balance
+          WHERE reported_2025 IS NOT NULL
+          ORDER BY ABS(recon_diff) DESC LIMIT 60;
+      trip_permits_missing:
+        title: "Completeness — trip permits absent from permit headers"
+        sql: |-
+          SELECT DISTINCT permit_no FROM trips
+          WHERE permit_no NOT IN (SELECT permit_no FROM permits) ORDER BY permit_no;
+      weight_loss_routes:
+        title: Routes with largest source→dest weight change
+        sql: |-
+          SELECT source, destination, ore_stream, trips,
+                 tonnage_src AS src_tons, tonnage AS dst_tons, delta
+          FROM routes
+          WHERE trips > 50
+          ORDER BY ABS(delta) DESC LIMIT 40;
