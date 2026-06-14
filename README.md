@@ -162,6 +162,20 @@ data1/ data2/        # raw RTI source spreadsheets (not generated)
   `geocode_villages.py` and run it; then re-run `ingest.py`.
 - **Refresh just the route map:** `uv run python build_route_map.py`
 
+## Deployment
+
+Live deployment (Debian + nginx + systemd, served by Datasette behind a reverse proxy)
+is documented step-by-step in **[`deploy/DEPLOY.md`](deploy/DEPLOY.md)**, with the
+supporting files in `deploy/`:
+
+- `deploy/goamines.service` — systemd unit (runs `.venv/bin/datasette` in immutable mode on `127.0.0.1:8001`)
+- `deploy/nginx-goamines.conf` — nginx reverse-proxy server block (certbot adds TLS)
+- `deploy/update.sh` — pull + `uv sync` + rebuild/refresh helper
+
+The database is provisioned out-of-band (it's git-ignored): either copy a locally-built
+`goamines.db` + `static/routes_map.html` to the server, or upload the raw data and run
+`ingest.py` on the box. See the runbook for both paths.
+
 ## Caveats (short version — full detail in `FINDINGS.md`)
 
 - Trip data starts **25-Mar-2024** (Bhumija era) and runs to ~Nov-2025, *past* the
