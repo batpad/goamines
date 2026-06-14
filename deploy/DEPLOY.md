@@ -102,13 +102,39 @@ and installs an auto-renewal timer.
 - **Point map**: `/goamines/location_map` shows the cluster map.
 - A canned query works, e.g. `/goamines/negative_balance_storage`.
 
-## 10. Updating later
+## 10. Downloads (source data via nginx)
+The homepage links three downloads: the **DB** (`/goamines.db`, served by Datasette — nothing
+to do), the **code** (GitHub), and the **source RTI spreadsheets** (a static zip served by
+nginx). To publish the source zip:
+
+```bash
+# a) create the downloads dir (once)
+sudo mkdir -p /var/www/goamines/downloads
+
+# b) build the zip on your LAPTOP (data spreadsheets only) and copy it up:
+#    cd <repo>; zip -r goamines-source-data.zip data1 data2 \
+#      -x 'data2/Annexure I.pdf' 'data2/Manuals.rar' 'data2/drive-download*'
+#    scp goamines-source-data.zip sanj@HOST:/tmp/
+sudo install -m 644 /tmp/goamines-source-data.zip /var/www/goamines/downloads/
+rm /tmp/goamines-source-data.zip
+
+# c) add the /downloads/ location to the LIVE nginx config (certbot-managed), inside the
+#    `listen 443 ssl` server block — see deploy/nginx-goamines.conf for the snippet:
+#        location /downloads/ { alias /var/www/goamines/downloads/; autoindex on; }
+sudo nano /etc/nginx/sites-available/goamines
+sudo nginx -t && sudo systemctl reload nginx
+```
+Verify: `curl -sI https://goamines.whydidweevendothis.com/downloads/goamines-source-data.zip | head -1`
+→ `200`. **To refresh** later, rebuild the zip and re-run step (b).
+
+## 11. Updating later
 ```bash
 sudo -u goamines /home/goamines/goamines/deploy/update.sh
 sudo systemctl restart goamines
 ```
 `update.sh` pulls, runs `uv sync`, and rebuilds the DB if `data1/`+`data2/` are present
-(otherwise just refreshes the route map from the existing DB).
+(otherwise just refreshes the route map from the existing DB). If the systemd unit changed,
+also re-copy it (step 6) and `daemon-reload` before restarting.
 
 ---
 

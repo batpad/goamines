@@ -13,6 +13,18 @@ description_html: |-
   <p>📊 <a href="/static/dashboard.html"><b>Overview dashboard</b></a>
   &nbsp;·&nbsp; 🗺️ <a href="/static/routes_map.html"><b>Ore-movement route map</b></a>
   &nbsp;·&nbsp; 📍 <a href="/goamines/location_map">Location point map</a></p>
+  <div style="border:1px solid #e0b400; background:#fffbe6; border-radius:8px; padding:10px 14px; margin:14px 0; font-size:13px;">
+  ⚠️ <b>Disclaimer</b> — this is community-processed data, <b>not an official record</b>, provided
+  with <b>no warranty as to accuracy or completeness</b>. These tables are derived from government
+  RTI source files by the open-source ingestion scripts linked below, and may contain processing
+  errors or reflect gaps and inconsistencies in the source. <b>Verify against the original source
+  files before relying on any figure.</b>
+  </div>
+  <p style="font-size:13px;">📥 <b>Source data</b> (RTI spreadsheets):
+  <a href="/downloads/goamines-source-data.zip">goamines-source-data.zip</a> (~24&nbsp;MB)
+  &nbsp;·&nbsp; 💻 <b>Ingestion code &amp; method</b>:
+  <a href="https://github.com/batpad/goamines">github.com/batpad/goamines</a>
+  &nbsp;·&nbsp; 🗄️ <b>Full database</b>: <a href="/goamines.db">goamines.db</a> (SQLite, ~96&nbsp;MB)</p>
 license: Open data (RTI); attribution to Rahul Basu / datameet
 source: RTI applications — Directorate of Mines & Geology, Goa
 

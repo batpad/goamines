@@ -66,6 +66,11 @@ Then open <http://127.0.0.1:8001/> (or whatever port Datasette prints):
 - **Canned queries** — top routes, monthly tonnage, busiest locations, the negative-balance
   check, stock reconciliation, completeness flags (defined in `datasette.yaml`).
 
+The homepage carries an **accuracy disclaimer** (community-processed data, no warranty) and
+links three downloads: the **DB** (`/goamines.db`, served by Datasette), the **code** (this
+repo), and the **source RTI spreadsheets** (a static zip served by nginx — see
+`deploy/DEPLOY.md` §10 for how it's published).
+
 > All Python is run through **`uv`** so the venv stays local to this repo. Use
 > `uv run python …` and `uv add <pkg>` — not bare `python`/`pip`.
 

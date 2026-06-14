@@ -16,3 +16,6 @@ static/routes_map.html
 # Raw RTI source data (large; distributed separately — see README)
 data1/
 data2/
+
+# Source-data download bundle (built locally, scp'd to the server)
+goamines-source-data.zip
